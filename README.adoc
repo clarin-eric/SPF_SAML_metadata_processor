@@ -1,0 +1,23 @@
+Collects, filters, splits/aggregates, SAML metadata about CLARIN SPF SPs across identity federations to assess its
+current state. Results are shown by the Centre Registry.
+
+This program is used from the command line. A fork of this codebase is available to the repository owner, with
+improvements (large-scale refactoring and systemd integration).
+
+== Requirements
+This software was tested with CPython 3.4 only. Most code has been deliberately kept CPython 3.2-compatible because of
+past deployment environment limitations.
+
+== To install
+Use the standard setuptools installation routine on `setup.py`.
+
+== To run
+For instance:
+
+[source,Sh]
+----
+python3 -m 'SPF_SAML_metadata_processor' \
+    -base_dir_path '/tmp/sps_at_identity_federations/' \
+    -commands download_all_saml_metadata_from_identity_federations \
+              split_identity_federation_saml_metadata_batches_and_diff_entities
+----

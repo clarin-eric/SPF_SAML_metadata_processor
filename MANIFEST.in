@@ -1,0 +1,8 @@
+include README.adoc README.txt setup.py *.py MANIFEST.in setup.cfg
+recursive-include SPF_SAML_metadata_processor/static *
+
+global-exclude __pycache__/*
+global-exclude .deps/*
+global-exclude *.pyd
+global-exclude *.pyc
+global-exclude .DS_Store
