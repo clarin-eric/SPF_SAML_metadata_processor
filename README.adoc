@@ -9,7 +9,11 @@ This software was tested with CPython 3.4 only. Most code has been deliberately 
 past deployment environment limitations.
 
 == To install
-Use the standard setuptools installation routine on `setup.py`.
+Use the standard setuptools installation routine on `setup.py`. To build a source distribution, necessary when this software is a dependency of some sort, issue:
+[source,Sh]
+----
+python setup.py sdist
+---
 
 == To run
 For instance:
@@ -18,6 +22,6 @@ For instance:
 ----
 python3 -m 'SPF_SAML_metadata_processor' \
     -base_dir_path '/tmp/sps_at_identity_federations/' \
-    -commands download_all_saml_metadata_from_identity_federations \
-              split_identity_federation_saml_metadata_batches_and_diff_entities
+    -commands download_all_saml_md_from_id_feds \
+              split_id_fed_saml_md_batches_and_diff_entities
 ----
