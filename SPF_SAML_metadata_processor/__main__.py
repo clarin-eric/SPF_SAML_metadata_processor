@@ -39,7 +39,7 @@ from lxml.etree import XMLParser
 from lxml.etree import XSLT
 from pkg_resources import resource_stream
 
-from spf_saml_metadata_processor.tempdir import TempDir
+from SPF_SAML_metadata_processor.tempdir import TempDir
 
 # TODO: Python 3.3+
 # from os import open
