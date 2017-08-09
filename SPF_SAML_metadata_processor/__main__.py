@@ -121,7 +121,7 @@ def download_all_saml_md_from_id_feds(base_dir_path: str):
         'https://centres.clarin.eu/api/model/SAMLIdentityFederation')
 
     saml_md_urls_json = loads(saml_id_fed_rqst.read().decode())
-    saml_md_urls = {elem['fields']['shorthand']: elem['fields']['saml_md_url']
+    saml_md_urls = {elem['fields']['shorthand']: elem['fields']['saml_metadata_url']
                     for elem in saml_md_urls_json}
 
     samlserviceprovider_rqst = urlopen(
