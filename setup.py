@@ -10,9 +10,9 @@ setup(author=__author__,
       author_email=__author__,
       classifiers=('Natural Language :: English',
                    'Programming Language :: Python',),
-      data_files=[('static', ['SPF_SAML_metadata_processor/static/'
+      data_files=[('static', ['spf_saml_metadata_processor/static/'
                               'remove_key_whitespace.xsl',
-                              'SPF_SAML_metadata_processor/static/'
+                              'spf_saml_metadata_processor/static/'
                               'remove_namespace_prefixes.xsl'])],
       # TODO: redundant?
       description='Collects, filters, splits/aggregates, SAML metadata about '
