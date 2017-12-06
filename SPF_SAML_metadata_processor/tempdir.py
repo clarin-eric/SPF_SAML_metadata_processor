@@ -82,7 +82,8 @@ class TempDir(ContextDecorator):
         if self.do_restore_mtimes:
             self._restore_mtimes()
 
-        rmtree(path=self.base_dir_path)
+        if isdir(self.base_dir_path):
+            rmtree(path=self.base_dir_path)
 
         chmod(self.temp_base_dir_path,
               self.directory_permissions)  # TODO: use keyword arguments once
