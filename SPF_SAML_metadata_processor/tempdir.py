@@ -13,6 +13,7 @@ from os.path import join
 from os.path import normpath
 from os.path import sep
 from shutil import move
+from shutil import rmtree
 from tempfile import mkdtemp
 
 
@@ -81,13 +82,7 @@ class TempDir(ContextDecorator):
         if self.do_restore_mtimes:
             self._restore_mtimes()
 
-        if isdir(self.base_dir_path):
-            bak_base_dir_path = mkdtemp(suffix=self.suffix)
-            warning("Trying to back up existent base directory '{"
-                    "base_dir_path:s}' to '{bak_base_dir_path:s}' ... ".format(
-                        base_dir_path=self.base_dir_path,
-                        bak_base_dir_path=bak_base_dir_path))
-            move(src=self.base_dir_path, dst=bak_base_dir_path)
+        rmtree(path=self.base_dir_path)
 
         chmod(self.temp_base_dir_path,
               self.directory_permissions)  # TODO: use keyword arguments once
