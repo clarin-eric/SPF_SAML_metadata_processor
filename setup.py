@@ -4,7 +4,7 @@ from setuptools import setup
 __author__ = 'Sander Maijers <sander@clarin.eu>'
 __version__ = '1.0.dev0'
 
-INSTALL_REQUIRES = ['lxml>3.4,<3.5']  # TODO: version
+INSTALL_REQUIRES = ['lxml>4.0,<4.5']  # TODO: version
 
 setup(author=__author__,
       author_email=__author__,
