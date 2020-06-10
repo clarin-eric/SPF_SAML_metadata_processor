@@ -251,7 +251,7 @@ def split_id_fed_saml_md_batches_and_diff_entities(base_dir_path: str,
 
                             with open(entitydescriptor_diff_file_path,
                                       mode='wt',
-                                      encoding='UTF-8') as \
+                                      encoding='utf-8-sig') as \
                                     entitydescriptor_diff_file:
                                 entitydescriptor_diff_file.writelines(
                                     differences)
