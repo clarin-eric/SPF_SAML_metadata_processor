@@ -70,20 +70,6 @@ def fetch_spf_sp_entityids(only_prod: bool=False):
     return saml_sps_dict
 
 
-def process_surfconext_saml_md_about_sps(data_generator):
-    subtrees = [entitydescriptor
-                for sp_md in data_generator
-                for entitydescriptor in extract_entitydescriptor_els(sp_md)]
-    root = Element(
-        '{{{md:s}}}EntitiesDescriptor'.format(md=NAMESPACE_PREFIX_MAP['md']),
-        nsmap=NAMESPACE_PREFIX_MAP)
-
-    for entitydescriptors in subtrees:
-        root.append(entitydescriptors)
-
-    return root
-
-
 def process_saml_md_about_sps(saml_md: bytes):
     saml_md_tree = XML(saml_md)
     parser = XMLParser(
@@ -130,50 +116,8 @@ def download_all_saml_md_from_id_feds(base_dir_path: str):
     saml_sp_entityids = [elem['fields']['entity_id']
                          for elem in saml_sp_entityids_json]
 
-    surfconext_saml_md_url = saml_md_urls['SURFconext']
-    sp_md_urls_at_surfconext = [
-        surfconext_saml_md_url + '?sp-entity-id=' +
-        quote_plus(saml_sp_entityid) for saml_sp_entityid in saml_sp_entityids
-    ]
-
-    pre_surfconext_saml_md_about_sps = []
-
-    for sp_md_url in sp_md_urls_at_surfconext:
-        try:
-            saml_md = urlopen(sp_md_url).read()
-            pre_surfconext_saml_md_about_sps += [saml_md]
-        except HTTPError as exc:
-            uri_descr = '\nThis problem occured with the URL "{url:s}". ' \
-                .format(url=exc.url)
-            warning(uri_descr)
-            warn(format_exc() + uri_descr, RuntimeWarning)
-        except URLError:
-            warning('An URLError occurred. ')
-            warn(format_exc(), RuntimeWarning)
-            # fp.info().get_content_charset()
-
-    surfconext_saml_md_about_sps = \
-        process_surfconext_saml_md_about_sps(pre_surfconext_saml_md_about_sps)
-
-    with open(
-            join(base_dir_path, 'SURFconext.xml'),
-            mode='wb') as surfconext_saml_md_file:
-        processed_surfconext_saml_md = process_saml_md_about_sps(
-            tostring(
-                surfconext_saml_md_about_sps,
-                pretty_print=True,
-                encoding='UTF-8',
-                xml_declaration=True))
-        surfconext_saml_md_file.write(
-            tostring(
-                processed_surfconext_saml_md,
-                pretty_print=True,
-                encoding='UTF-8',
-                xml_declaration=True))
-
     saml_md_urls = {key: value
-                    for (key, value) in saml_md_urls.items()
-                    if key != 'SURFconext'}
+                    for (key, value) in saml_md_urls.items()}
 
     # Process rest of identity federations.
     for id_fed_name, saml_md_url in saml_md_urls.items():
