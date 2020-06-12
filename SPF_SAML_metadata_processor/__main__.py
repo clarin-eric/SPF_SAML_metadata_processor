@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
+import logging
 from argparse import ArgumentParser
 from difflib import unified_diff
 from glob import iglob
 from io import BytesIO
 from json import dump
 from json import loads
-from logging import basicConfig
-from logging import INFO
-from logging import warning
 from os import mkdir
 from os import umask
 from os.path import basename
@@ -26,12 +24,10 @@ from stat import S_IXOTH
 from stat import S_IXUSR
 from traceback import format_exc
 from urllib.parse import quote_plus
-from urllib.request import HTTPError
-from urllib.request import URLError
+from urllib.error import HTTPError
+from urllib.error import URLError
 from urllib.request import urlopen
-from warnings import warn
 
-from lxml.etree import Element
 from lxml.etree import parse
 from lxml.etree import tostring
 from lxml.etree import XML
@@ -40,10 +36,6 @@ from lxml.etree import XSLT
 from pkg_resources import resource_stream
 
 from SPF_SAML_metadata_processor.tempdir import TempDir
-
-# TODO: Python 3.3+
-# from os import open
-# opener = open(mode=0o777)
 
 CLARIN_IDP_FED_NAME = 'CLARIN IdP'
 CLARIN_IDP_XML_FILE_NAME = CLARIN_IDP_FED_NAME + '.xml'
@@ -72,12 +64,12 @@ def fetch_spf_sp_entityids(only_prod: bool=False):
 
 def process_saml_md_about_sps(saml_md: bytes):
     saml_md_tree = XML(saml_md)
-    parser = XMLParser(
+    localparser = XMLParser(
         remove_blank_text=True, resolve_entities=False, remove_comments=False)
     with resource_stream(__name__,
                          REMOVE_NAMESPACE_PREFIXES_XSL_FILE_PATH) as \
             xslt_root1_file:
-        xslt_root1 = parse(xslt_root1_file, parser=parser)
+        xslt_root1 = parse(xslt_root1_file, parser=localparser)
 
         transform1 = XSLT(xslt_root1)
         saml_md_tree_1 = transform1(saml_md_tree)
@@ -85,7 +77,7 @@ def process_saml_md_about_sps(saml_md: bytes):
     with resource_stream(__name__,
                          REMOVE_KEY_WHITESPACE_XSL_FILE_PATH) as \
             xslt_root2_file:
-        xslt_root2 = parse(xslt_root2_file, parser=parser)
+        xslt_root2 = parse(xslt_root2_file, parser=localparser)
 
     transform2 = XSLT(xslt_root2)
     saml_md_2 = transform2(saml_md_tree_1)
@@ -94,10 +86,8 @@ def process_saml_md_about_sps(saml_md: bytes):
     saml_md_2.write_c14n(
         canonicalized_saml_md_2, exclusive=True, with_comments=False)
 
-    parser = XMLParser(
-        remove_blank_text=True, resolve_entities=False, remove_comments=False)
     saml_md_tree_3 = XML(canonicalized_saml_md_2.getvalue(),
-                         parser).getroottree()
+                         localparser).getroottree()
 
     return saml_md_tree_3
 
@@ -110,12 +100,6 @@ def download_all_saml_md_from_id_feds(base_dir_path: str):
     saml_md_urls = {elem['fields']['shorthand']: elem['fields']['saml_metadata_url']
                     for elem in saml_md_urls_json}
 
-    samlserviceprovider_rqst = urlopen(
-        'https://centres.clarin.eu/api/model/SAMLServiceProvider')
-    saml_sp_entityids_json = loads(samlserviceprovider_rqst.read().decode())
-    saml_sp_entityids = [elem['fields']['entity_id']
-                         for elem in saml_sp_entityids_json]
-
     saml_md_urls = {key: value
                     for (key, value) in saml_md_urls.items()}
 
@@ -124,10 +108,9 @@ def download_all_saml_md_from_id_feds(base_dir_path: str):
         try:
             saml_md = urlopen(saml_md_url).read()
         except (URLError, HTTPError):
-            uri_descr = '\nThis problem occured with the URL "{' \
-                        'SAML_metadata_URL:s}". '. \
+            uri_descr = '\nThis problem occured with the URL "{SAML_metadata_URL:s}". '. \
                 format(SAML_metadata_URL=saml_md_url)
-            warning(format_exc() + uri_descr, RuntimeWarning)
+            logging.warning("{}".format(format_exc() + uri_descr, RuntimeWarning))
         else:
             processed_saml_md = process_saml_md_about_sps(saml_md)
             with open(
@@ -140,11 +123,49 @@ def download_all_saml_md_from_id_feds(base_dir_path: str):
                         encoding='UTF-8',
                         xml_declaration=True))
 
+def generate_extra_surf_entities_summary(base_dir_path: str, spf_sp_entityids: set):
+    logging.info("Generating 'extra_sps_at_surfconext.html' page...")
+
+    extra_sps_at_surf = find_extra_surf_entities(base_dir_path, spf_sp_entityids)
+
+    surf_extra_entities_summary = dict()
+    surf_extra_entities_summary['extra_sps_at_surfconext'] = dict ()
+    if extra_sps_at_surf:
+        extra_sps_at_surf_array = surf_extra_entities_summary['extra_sps_at_surfconext']['entities'] = []
+        for sp in extra_sps_at_surf:
+            extra_sps_at_surf_array.append(sp)
+
+    summary_path = join(base_dir_path, 'extra_sps_at_surfconext.json')
+    with open(
+            summary_path,
+            mode='w') as summary_file:
+        dump(surf_extra_entities_summary,
+            summary_file,
+            indent=4,
+            sort_keys=True)
+
+def find_extra_surf_entities(base_dir_path: str, spf_sp_entityids: set):
+    logging.info("Finding non-existent CLARIN SPs in SURFconext...")
+    sp_entityids_at_surf = get_surf_entity_ids(base_dir_path)
+    extra_sps_at_surf = sp_entityids_at_surf.difference(spf_sp_entityids)
+    logging.info("The following CLARIN SPs exist at SURFconext but are not part of the SPF: {}".format(extra_sps_at_surf))
+    return sorted(extra_sps_at_surf)
+
+def get_surf_entity_ids(base_dir_path: str):
+    logging.info("Selecting SP entity IDs from SURFconext...")
+    with open(join(base_dir_path, 'SURFconext.xml'), "rb") as clarin_sps_at_surf_file:
+        clarin_sps_at_surf_md = XML(clarin_sps_at_surf_file.read())
+        entities = set()
+        for e in clarin_sps_at_surf_md.xpath("//md:EntityDescriptor", namespaces=NAMESPACE_PREFIX_MAP):
+            entities.add(e.get('entityID'))
+    return entities
+
+
 
 def extract_entitydescriptor_els(xml: bytes):
-    parser = XMLParser(
+    localparser = XMLParser(
         remove_blank_text=True, resolve_entities=False, remove_comments=True)
-    tree = parse(BytesIO(xml), parser=parser).getroot()
+    tree = parse(BytesIO(xml), parser=localparser).getroot()
 
     entitydescriptors = tree.iterfind(
         'md:EntityDescriptor[md:SPSSODescriptor]',
@@ -264,10 +285,7 @@ def split_id_fed_saml_md_batches_and_diff_entities(base_dir_path: str,
             indent=4,
             sort_keys=True)
 
-
 if __name__ == '__main__':
-    basicConfig(level=INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
     parser = ArgumentParser(
         description='Collects, filters, splits/aggregates, SAML metadata '
         'about CLARIN SPF SPs across identity federations to '
@@ -280,7 +298,15 @@ if __name__ == '__main__':
         type=str,
         nargs='+',
         help='Command(s) to execute')
+    parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help="Set the logging level",
+        default="INFO")
     args = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s [%(levelname)s]: %(message)s')
+
     BASE_DIR_PATH = str(args.base_dir_path)
     COMMANDS = args.commands
     VALID_COMMANDS = (
@@ -288,8 +314,7 @@ if __name__ == '__main__':
         split_id_fed_saml_md_batches_and_diff_entities.__name__, )
     if any(command not in VALID_COMMANDS for command in COMMANDS):
         raise RuntimeError(
-            'One invalid and/or zero valid commands specified: {'
-            'commands}'.format(commands=COMMANDS))
+            'One invalid and/or zero valid commands specified: {commands}'.format(commands=COMMANDS))
     umask(0o022)
     with TempDir(
             base_dir_path=BASE_DIR_PATH,
@@ -306,5 +331,9 @@ if __name__ == '__main__':
                 SPF_SP_ENTITYIDS = fetch_spf_sp_entityids()
 
                 split_id_fed_saml_md_batches_and_diff_entities(
+                    base_dir_path=temp_dir.temp_base_dir_path,
+                    spf_sp_entityids=SPF_SP_ENTITYIDS)
+
+                generate_extra_surf_entities_summary(
                     base_dir_path=temp_dir.temp_base_dir_path,
                     spf_sp_entityids=SPF_SP_ENTITYIDS)
