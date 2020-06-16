@@ -43,7 +43,12 @@ CLARIN_IDP_XML_FILE_NAME = CLARIN_IDP_FED_NAME + '.xml'
 DIRECTORY_PERMISSIONS = S_ISGID | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | \
                         S_IXGRP | S_IROTH | S_IXOTH
 
-NAMESPACE_PREFIX_MAP = {'md': "urn:oasis:names:tc:SAML:2.0:metadata"}
+NAMESPACE_PREFIX_MAP = {
+    "md": "urn:oasis:names:tc:SAML:2.0:metadata",
+    "mdrpi": "urn:oasis:names:tc:SAML:metadata:rpi",
+    "mdattr": "urn:oasis:names:tc:SAML:metadata:attribute",
+    "saml": "urn:oasis:names:tc:SAML:2.0:assertion",
+}
 
 REMOVE_NAMESPACE_PREFIXES_XSL_FILE_PATH = \
     'static/remove_namespace_prefixes.xsl'
@@ -123,40 +128,52 @@ def download_all_saml_md_from_id_feds(base_dir_path: str):
                         encoding='UTF-8',
                         xml_declaration=True))
 
-def generate_extra_surf_entities_summary(base_dir_path: str, spf_sp_entityids: set):
-    logging.info("Generating 'extra_sps_at_surfconext.html' page...")
+def generate_federation_extra_sps_summary(base_dir_path: str, spf_sp_entityids: set):
 
-    extra_sps_at_surf = find_extra_surf_entities(base_dir_path, spf_sp_entityids)
+    saml_md_filenames = [file_path for file_path in
+                         iglob(join(base_dir_path, '*.xml')) if
+                         basename(file_path) != CLARIN_IDP_XML_FILE_NAME]
 
-    surf_extra_entities_summary = dict()
-    surf_extra_entities_summary['extra_sps_at_surfconext'] = dict ()
-    if extra_sps_at_surf:
-        extra_sps_at_surf_array = surf_extra_entities_summary['extra_sps_at_surfconext']['entities'] = []
-        for sp in extra_sps_at_surf:
-            extra_sps_at_surf_array.append(sp)
+    federation_sps = dict()
 
-    summary_path = join(base_dir_path, 'extra_sps_at_surfconext.json')
+    for federation_md_file_path in saml_md_filenames:
+        if isfile(federation_md_file_path):
+            fed_name, _ = splitext(basename(federation_md_file_path))
+
+            extra_sps_at_federation = get_extra_clarin_sps_in_federation(fed_name, federation_md_file_path, spf_sp_entityids)
+            if extra_sps_at_federation:
+                federation_sps[fed_name] = []
+                for sp in extra_sps_at_federation:
+                    federation_sps[fed_name].append(sp)
+    logging.info("Generating 'extra_sps_at_federations.json' page...")
+    summary_path = join(base_dir_path, "extra_sps_at_federations.json")
     with open(
-            summary_path,
-            mode='w') as summary_file:
-        dump(surf_extra_entities_summary,
+        summary_path,
+        mode='w') as summary_file:
+        dump(federation_sps,
             summary_file,
             indent=4,
             sort_keys=True)
 
-def find_extra_surf_entities(base_dir_path: str, spf_sp_entityids: set):
-    logging.info("Finding non-existent CLARIN SPs in SURFconext...")
-    sp_entityids_at_surf = get_surf_entity_ids(base_dir_path)
-    extra_sps_at_surf = sp_entityids_at_surf.difference(spf_sp_entityids)
-    logging.info("The following CLARIN SPs exist at SURFconext but are not part of the SPF: {}".format(extra_sps_at_surf))
-    return sorted(extra_sps_at_surf)
+def get_extra_clarin_sps_in_federation(id_fed_name: str, federation_md_file_path: str, spf_sp_entityids: set):
+    logging.info("Finding non-existent CLARIN SPs in {}...".format(id_fed_name))
+    clarin_entityids_at_federation = get_federation_clarin_sps(id_fed_name, federation_md_file_path)
+    extra_sps_at_federation = clarin_entityids_at_federation.difference(spf_sp_entityids)
+    logging.info("The following CLARIN SPs exist at {} but are not part of the SPF: {}".format(id_fed_name, extra_sps_at_federation))
+    return sorted(extra_sps_at_federation)
 
-def get_surf_entity_ids(base_dir_path: str):
-    logging.info("Selecting SP entity IDs from SURFconext...")
-    with open(join(base_dir_path, 'SURFconext.xml'), "rb") as clarin_sps_at_surf_file:
-        clarin_sps_at_surf_md = XML(clarin_sps_at_surf_file.read())
+def get_federation_clarin_sps(id_fed_name: str,federation_md_file_path: str):
+    logging.info("Selecting SP entity IDs from {}...".format(id_fed_name))
+    with open(federation_md_file_path, "rb") as clarin_sps_at_federation_file:
+        clarin_sps_at_federation_md = XML(clarin_sps_at_federation_file.read())
         entities = set()
-        for e in clarin_sps_at_surf_md.xpath("//md:EntityDescriptor", namespaces=NAMESPACE_PREFIX_MAP):
+        xpath = "//md:EntityDescriptor[md:Extensions/mdattr:EntityAttributes/saml:Attribute[\
+                        @Name='http://macedir.org/entity-category']/saml:AttributeValue[text() =\
+                        'http://clarin.eu/category/clarin-member']]"
+        # SURFconext's feed is already only showing CLARIN SPs
+        if id_fed_name == "SURFconext":
+            xpath = "//md:EntityDescriptor"
+        for e in clarin_sps_at_federation_md.xpath(xpath, namespaces=NAMESPACE_PREFIX_MAP):
             entities.add(e.get('entityID'))
     return entities
 
@@ -334,6 +351,6 @@ if __name__ == '__main__':
                     base_dir_path=temp_dir.temp_base_dir_path,
                     spf_sp_entityids=SPF_SP_ENTITYIDS)
 
-                generate_extra_surf_entities_summary(
+                generate_federation_extra_sps_summary(
                     base_dir_path=temp_dir.temp_base_dir_path,
                     spf_sp_entityids=SPF_SP_ENTITYIDS)
