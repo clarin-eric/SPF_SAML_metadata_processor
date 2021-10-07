@@ -71,14 +71,14 @@ def process_saml_md_about_sps(saml_md: bytes):
     saml_md_tree = XML(saml_md)
     localparser = XMLParser(
         remove_blank_text=True, resolve_entities=False, remove_comments=False)
-    ref = files(__name__).joinpath(REMOVE_NAMESPACE_PREFIXES_XSL_FILE_PATH)
+    ref = files('SPF_SAML_metadata_processor').joinpath(REMOVE_NAMESPACE_PREFIXES_XSL_FILE_PATH)
     with ref.open('rb') as xslt_root1_file:
         xslt_root1 = parse(xslt_root1_file, parser=localparser)
 
         transform1 = XSLT(xslt_root1)
         saml_md_tree_1 = transform1(saml_md_tree)
 
-    ref = files(__name__).joinpath(REMOVE_KEY_WHITESPACE_XSL_FILE_PATH)
+    ref = files('SPF_SAML_metadata_processor').joinpath(REMOVE_KEY_WHITESPACE_XSL_FILE_PATH)
     with ref.open('rb') as xslt_root2_file:
         xslt_root2 = parse(xslt_root2_file, parser=localparser)
 
