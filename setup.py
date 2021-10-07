@@ -8,8 +8,8 @@ INSTALL_REQUIRES = ['lxml>=4.0']  # TODO: version
 
 setup(author=__author__,
       author_email=__author__,
-      classifiers=('Natural Language :: English',
-                   'Programming Language :: Python',),
+      classifiers=['Natural Language :: English',
+                   'Programming Language :: Python',],
       data_files=[('static', ['SPF_SAML_metadata_processor/static/'
                               'remove_key_whitespace.xsl',
                               'SPF_SAML_metadata_processor/static/'
